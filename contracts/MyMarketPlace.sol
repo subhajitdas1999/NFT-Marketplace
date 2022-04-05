@@ -36,8 +36,8 @@ contract MyMarketPlace{
 
     //event for item listing 
     event listed(uint itemId, IERC721 contractAddress, uint tokenId,uint price ,address seller);
-    //event for item purchsed
-    event purchsed(uint itemId,IERC721 contractAddress, uint tokenId,address from,uint price);
+    //event for item purchase
+    event purchase(uint itemId,IERC721 contractAddress, uint tokenId,address from,uint price);
 
     constructor (uint _feePercentage){
         _feeReciever = payable(msg.sender);
@@ -89,7 +89,7 @@ contract MyMarketPlace{
         //forward the fund to fee reciever
         _forwardFunds();
 
-        emit purchsed(_itemId,item.contractAddress, item.tokenId,item.seller,requiredAmount);
+        emit purchase(_itemId,item.contractAddress, item.tokenId,item.seller,requiredAmount);
 
     }
 
