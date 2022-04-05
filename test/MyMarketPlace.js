@@ -13,6 +13,23 @@ describe("MyMarketPlace Contract", () => {
 
   const feePercentage = 3;
 
+  const listNFTFromOwnerAccountTokenID1 = async () => {
+    //approve the marketplace as an operator
+    await MyNFTERC721Instance.setApprovalForAll(
+      MyMarketPlaceInstance.address,
+      true
+    );
+
+    // list an NFT with the token ID 1
+    await expect(
+      MyMarketPlaceInstance.listNFTforSale(
+        ethers.utils.parseUnits("0.0001", "ether").toString(),
+        MyNFTERC721Instance.address,
+        1
+      )
+    ).to.emit(MyMarketPlaceInstance, "listed");
+  };
+
   beforeEach(async () => {
     [owner, addr1, addr2, ...addrs] = await ethers.getSigners();
     MyMarketPlace = await ethers.getContractFactory("MyMarketPlace");
@@ -63,37 +80,13 @@ describe("MyMarketPlace Contract", () => {
   });
 
   it("NFT Owner should be able to list items after approving MarketPlace and all other conditions and emit listed events", async () => {
-    //approve the marketplace as an operator
-    await MyNFTERC721Instance.setApprovalForAll(
-      MyMarketPlaceInstance.address,
-      true
-    );
-
-    // list the NFT with the token ID 1
-    await expect(
-      MyMarketPlaceInstance.listNFTforSale(
-        ethers.utils.parseUnits("1", "ether").toString(),
-        MyNFTERC721Instance.address,
-        1
-      )
-    ).to.emit(MyMarketPlaceInstance, "listed");
+    //list the NFT
+    await listNFTFromOwnerAccountTokenID1();
   });
 
   it("owner cannot list a one NFT multiple times", async () => {
-    //approve the marketplace as an operator
-    await MyNFTERC721Instance.setApprovalForAll(
-      MyMarketPlaceInstance.address,
-      true
-    );
-
-    // list an NFT with the token ID 1
-    await expect(
-      MyMarketPlaceInstance.listNFTforSale(
-        ethers.utils.parseUnits("1", "ether").toString(),
-        MyNFTERC721Instance.address,
-        1
-      )
-    ).to.emit(MyMarketPlaceInstance, "listed");
+    //list the NFT
+    await listNFTFromOwnerAccountTokenID1();
 
     //try to list the same NFT again
     await expect(
@@ -103,34 +96,68 @@ describe("MyMarketPlace Contract", () => {
         1
       )
     ).to.be.revertedWith("NFT is already in sale");
-    
   });
 
   it("After listing a NFT, correct listing info should be there for sale", async () => {
-    //approve the marketplace as an operator
-    await MyNFTERC721Instance.setApprovalForAll(
-      MyMarketPlaceInstance.address,
-      true
-    );
-
-    // list an NFT with the token ID 1
-    await expect(
-      MyMarketPlaceInstance.listNFTforSale(
-        ethers.utils.parseUnits("1", "ether").toString(),
-        MyNFTERC721Instance.address,
-        1
-      )
-    ).to.emit(MyMarketPlaceInstance, "listed");
+    //list the NFT
+    await listNFTFromOwnerAccountTokenID1();
 
     const [itemId, contractAddress, tokenId, price, seller, sold] =
       await MyMarketPlaceInstance.items(1);
 
     expect(contractAddress).to.equal(MyNFTERC721Instance.address);
     expect(tokenId).to.equal(1); //token Id 1 is listed
-    expect(price).to.equal(ethers.utils.parseUnits("1", "ether").toString());
+    expect(price).to.equal(ethers.utils.parseUnits("0.0001", "ether").toString());
     expect(seller).to.equal(owner.address);
     expect(sold).to.equal(false);
   });
 
-  
+  it("User cannot buy NFT with Invalid item id", async () => {
+    //list the NFT
+    await listNFTFromOwnerAccountTokenID1();
+
+    //try to buy with invalid id (ex:0)
+    await expect(
+      MyMarketPlaceInstance.buyNFT(0, {
+        value: ethers.utils.parseUnits("1", "ether"),
+      })
+    ).to.be.revertedWith("NFT is not exist");
+  });
+
+  it("user should able to purchase NFT and Become an Owner", async () => {
+    //list the NFT
+    await listNFTFromOwnerAccountTokenID1();
+
+    //buy from addr1
+    await expect(
+      MyMarketPlaceInstance.connect(addr1).buyNFT(1, {
+        value: ethers.utils.parseUnits("1", "ether"),
+      })
+    ).to.emit(MyMarketPlaceInstance, "purchase");
+
+    //addr1 should be the new owner
+    expect(await MyNFTERC721Instance.ownerOf(1)).to.equal(addr1.address);
+  });
+
+  it("Cannnot purchase an NFT , which is already purchased",async()=>{
+    //list the NFT
+    await listNFTFromOwnerAccountTokenID1();
+
+    //buy from addr1
+    await expect(
+      MyMarketPlaceInstance.connect(addr1).buyNFT(1, {
+        value: ethers.utils.parseUnits("1", "ether"),
+      })
+    ).to.emit(MyMarketPlaceInstance, "purchase");
+
+    //try to buy this NFT again
+    await expect(
+      MyMarketPlaceInstance.connect(addr1).buyNFT(1, {
+        value: ethers.utils.parseUnits("1", "ether"),
+      })
+    ).to.be.revertedWith("This NFT is already sold");
+
+  })
+
+
 });
