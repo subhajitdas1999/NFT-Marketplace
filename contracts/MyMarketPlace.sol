@@ -70,7 +70,7 @@ contract MyMarketPlace{
     }
 
     function buyNFT(uint _itemId) public payable{
-        require(_itemId<=_itemcounter,"NFT is not exist");
+        require(_itemId<=_itemcounter && _itemId>0,"NFT is not exist");
         require(!items[_itemId].sold ,"This NFT is already sold");
 
         //getting the amount required including percentage fee
