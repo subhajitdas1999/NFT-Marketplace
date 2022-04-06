@@ -1,5 +1,7 @@
 const { expect } = require("chai");
-const { ethers } = require("hardhat");
+const { BigNumber } = require("ethers");
+const { ethers, waffle } = require("hardhat");
+const provider = waffle.provider;
 
 describe("MyMarketPlace Contract", () => {
   let owner;
@@ -156,6 +158,53 @@ describe("MyMarketPlace Contract", () => {
         value: ethers.utils.parseUnits("1", "ether"),
       })
     ).to.be.revertedWith("This NFT is already sold");
+  })
+
+  it("Owner should get paid for his NFT and MarketPlace owner should recieve his percentage",async()=>{
+    // transfer the TokenId 1 from owner to addr1
+    await MyNFTERC721Instance.transferFrom(owner.address,addr1.address,1);
+
+    //approve the marketplace as an operator from addr1
+    await MyNFTERC721Instance.connect(addr1).setApprovalForAll(
+      MyMarketPlaceInstance.address,
+      true
+    );
+
+    // list an NFT with the token ID 1
+    const NFTsellingPrice = ethers.utils.parseUnits("0.0001", "ether");
+    await expect(
+      MyMarketPlaceInstance.connect(addr1).listNFTforSale(
+        NFTsellingPrice,
+        MyNFTERC721Instance.address,
+        1
+      )
+    ).to.emit(MyMarketPlaceInstance, "listed");
+    
+    const ownerOldBalance = await provider.getBalance(owner.address);
+    const addr1OldBalance = await provider.getBalance(addr1.address);
+
+    //buy from addr2
+    const NFTBuyPrice = ethers.utils.parseUnits("1", "ether")
+    await expect(
+      MyMarketPlaceInstance.connect(addr2).buyNFT(1, {
+        value: NFTBuyPrice,
+      })
+    ).to.emit(MyMarketPlaceInstance, "purchase");
+
+    const ownerNewBalance = await provider.getBalance(owner.address);
+    const addr1NewBalance = await provider.getBalance(addr1.address);
+
+    //add1 should recieved NFT selling price which is 0.0001 ether
+    const add1Recieved = BigNumber.from(addr1NewBalance).sub(BigNumber.from(addr1OldBalance));
+    //remaining amount should recieved by owner of the marketplace
+    const ownerRecieved = BigNumber.from(ownerNewBalance).sub(BigNumber.from(ownerOldBalance));
+    
+
+    expect(add1Recieved).to.equal(NFTsellingPrice);
+    expect(ownerRecieved).to.equal(BigNumber.from(NFTBuyPrice).sub(BigNumber.from(NFTsellingPrice))) ;
+
+
+    
 
   })
 
