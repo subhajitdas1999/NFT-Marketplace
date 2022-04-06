@@ -3,6 +3,8 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "hardhat/console.sol";
+
 
 contract MyMarketPlace{
     
@@ -78,6 +80,9 @@ contract MyMarketPlace{
 
         require(msg.value >= requiredAmount,"send more ether");
 
+        //forward the fund to fee reciever
+        _forwardFunds(_itemId);
+
         Item storage item = items[_itemId];
 
         // transfering the NFT to the buyer
@@ -85,9 +90,6 @@ contract MyMarketPlace{
 
         //marking the item as sold
         item.sold = true;
-
-        //forward the fund to fee reciever
-        _forwardFunds();
 
         emit purchase(_itemId,item.contractAddress, item.tokenId,item.seller,requiredAmount);
 
@@ -109,7 +111,16 @@ contract MyMarketPlace{
         return item.sold == true;
     }
 
-    function _forwardFunds() private {
-        _feeReciever.transfer(msg.value);
+    function _forwardFunds(uint _itemId) private {
+        uint totalEtherSend = msg.value;
+
+        //send money to the seller
+        Item memory item = items[_itemId];
+        (item.seller).transfer(item.price);
+
+        totalEtherSend -= item.price;
+        
+        //send the remaining money to Marketplace owner
+        _feeReciever.transfer(totalEtherSend);
     }
 }
