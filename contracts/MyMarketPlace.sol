@@ -119,7 +119,7 @@ contract MyMarketPlace{
         (item.seller).transfer(item.price);
 
         totalEtherSend -= item.price;
-        
+
         //send the remaining money to Marketplace owner
         _feeReciever.transfer(totalEtherSend);
     }
