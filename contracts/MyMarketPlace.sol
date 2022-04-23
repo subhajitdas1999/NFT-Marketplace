@@ -3,17 +3,19 @@
 pragma solidity ^0.8.13;
 
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "hardhat/console.sol";
+
 
 contract MyMarketPlace{
     
     //account that going to recieve fees over tx
-    address payable private immutable _feeReciever;
+    address payable public immutable _feeReciever;
 
     //fee percent, going to add on each item
-    uint private immutable feePercentage;
+    uint public immutable feePercentage;
 
     //minimum price for listing an NFT
-    uint private minListingPrice= 0.00001 ether;
+    uint public minListingPrice= 0.00001 ether;
 
     //contains details of one item
     struct Item{
@@ -36,8 +38,8 @@ contract MyMarketPlace{
 
     //event for item listing 
     event listed(uint itemId, IERC721 contractAddress, uint tokenId,uint price ,address seller);
-    //event for item purchsed
-    event purchsed(uint itemId,IERC721 contractAddress, uint tokenId,address from,uint price);
+    //event for item purchase
+    event purchase(uint itemId,IERC721 contractAddress, uint tokenId,address from,uint price);
 
     constructor (uint _feePercentage){
         _feeReciever = payable(msg.sender);
@@ -46,7 +48,7 @@ contract MyMarketPlace{
 
     function listNFTforSale(uint _price,IERC721 _contractAddress ,uint _tokenId) public{
         require(_price > minListingPrice,"minimum listing price is 0.00001 ether");
-        require(_contractAddress.ownerOf(_tokenId) == msg.sender,"Owner is  required for listing");
+        require(_contractAddress.ownerOf(_tokenId) == msg.sender,"Owner is required for listing");
         require(_contractAddress.isApprovedForAll(msg.sender,address(this)),"Owner should approved this marketPlace as a operator before listings");
         require(_validateAddressAndToken(_contractAddress,_tokenId),"NFT is already in sale");
         
@@ -70,13 +72,16 @@ contract MyMarketPlace{
     }
 
     function buyNFT(uint _itemId) public payable{
-        require(_itemId<=_itemcounter,"NFT is not exist");
+        require(_itemId<=_itemcounter && _itemId>0,"NFT is not exist");
         require(!items[_itemId].sold ,"This NFT is already sold");
 
         //getting the amount required including percentage fee
         uint requiredAmount = getAmount(_itemId);
 
         require(msg.value >= requiredAmount,"send more ether");
+
+        //forward the fund to fee reciever
+        _forwardFunds(_itemId);
 
         Item storage item = items[_itemId];
 
@@ -86,10 +91,7 @@ contract MyMarketPlace{
         //marking the item as sold
         item.sold = true;
 
-        //forward the fund to fee reciever
-        _forwardFunds();
-
-        emit purchsed(_itemId,item.contractAddress, item.tokenId,item.seller,requiredAmount);
+        emit purchase(_itemId,item.contractAddress, item.tokenId,item.seller,requiredAmount);
 
     }
 
@@ -109,7 +111,16 @@ contract MyMarketPlace{
         return item.sold == true;
     }
 
-    function _forwardFunds() private {
-        _feeReciever.transfer(msg.value);
+    function _forwardFunds(uint _itemId) private {
+        uint totalEtherSend = msg.value;
+
+        //send money to the seller
+        Item memory item = items[_itemId];
+        (item.seller).transfer(item.price);
+
+        totalEtherSend -= item.price;
+
+        //send the remaining money to Marketplace owner
+        _feeReciever.transfer(totalEtherSend);
     }
 }
